@@ -1,7 +1,10 @@
 import { body, param, query } from "express-validator";
 import handleValidationErrors from "../../common/utils/handleValidationErrors";
+import verifyJWT from "../../common/middlewares/verifyJwt";
+import { TokenType } from "../../common/types";
 
 export const createMealValidator = [
+    verifyJWT([TokenType.ACCESS]),
     body("name")
         .trim()
         .notEmpty()
@@ -33,6 +36,7 @@ export const createMealValidator = [
 ];
 
 export const updateMealValidator = [
+    verifyJWT([TokenType.ACCESS]),
     param("id")
         .isUUID()
         .withMessage("Valid meal id is required"),
@@ -80,6 +84,7 @@ export const updateMealValidator = [
 ];
 
 export const mealIdParamValidator = [
+    verifyJWT([TokenType.ACCESS]),
     param("id")
         .isUUID()
         .withMessage("Valid meal id is required"),
@@ -87,6 +92,7 @@ export const mealIdParamValidator = [
 ];
 
 export const getMealsValidator = [
+    verifyJWT([TokenType.ACCESS]),
     query("date")
         .optional()
         .isISO8601()
