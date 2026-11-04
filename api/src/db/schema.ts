@@ -1,9 +1,9 @@
-import { pgTable, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, uuid, index, inet, varchar } from "drizzle-orm/pg-core";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export const users = pgTable("users", {
-    id: text("id").primaryKey(),
+    id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
@@ -23,8 +23,8 @@ export type NewUser = typeof users.$inferInsert;
 // ─── Meals ────────────────────────────────────────────────────────────────────
 
 export const meals = pgTable("meals", {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
         .notNull()
         .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
@@ -41,8 +41,8 @@ export type NewMeal = typeof meals.$inferInsert;
 // ─── Refresh Tokens ───────────────────────────────────────────────────────────
 
 export const refreshTokens = pgTable("refresh_tokens", {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
         .notNull()
         .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull().unique(),
@@ -53,3 +53,70 @@ export const refreshTokens = pgTable("refresh_tokens", {
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
 
+
+export const sessions = pgTable(
+    'sessions',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+
+        userId: uuid('user_id')
+            .notNull()
+            .references(() => users.id, {
+                onDelete: 'cascade',
+            }),
+
+        // SHA-256 hash of the refresh token
+        refreshTokenHash: varchar('refresh_token_hash', {
+            length: 64,
+        }).notNull().unique(),
+
+        deviceId: varchar('device_id', {
+            length: 255,
+        }),
+
+        deviceName: varchar('device_name', {
+            length: 255,
+        }),
+
+        deviceType: varchar('device_type', {
+            length: 50,
+        }),
+
+        userAgent: text('user_agent'),
+
+        ipAddress: inet('ip_address'),
+
+        // Session expiration
+        expiresAt: timestamp('expires_at', {
+            withTimezone: true,
+        }).notNull(),
+
+        // Last successful activity
+        lastActiveAt: timestamp('last_active_at', {
+            withTimezone: true,
+        }).defaultNow().notNull(),
+
+        // Revocation support
+        revokedAt: timestamp('revoked_at', {
+            withTimezone: true,
+        }),
+
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+        }).defaultNow().notNull(),
+
+        updatedAt: timestamp('updated_at', {
+            withTimezone: true,
+        }).defaultNow().notNull(),
+    },
+    (table) => [
+        index('sessions_user_id_idx')
+            .on(table.userId),
+
+        index('sessions_expires_at_idx')
+            .on(table.expiresAt),
+
+        index('sessions_revoked_at_idx')
+            .on(table.revokedAt),
+    ],
+);
