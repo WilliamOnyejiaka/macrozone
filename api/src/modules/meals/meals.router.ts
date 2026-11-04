@@ -13,7 +13,7 @@ import {
     updateMealValidator,
     mealIdParamValidator,
     getMealsValidator,
-} from "./meal.validator";
+} from "./meals.validator";
 
 const router = Router();
 
