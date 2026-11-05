@@ -1,3 +1,4 @@
+import "multer";
 import { validationResult } from "express-validator";
 import { Request, Response, NextFunction } from "express";
 import deleteFiles from "./deleteFiles";
@@ -14,11 +15,13 @@ export default async function handleValidationErrors(req: Request, res: Response
             res.status(400).json({ error: true, message: msg });
             return;
         } finally {
-            if (req.file) {
-                await deleteFiles(req.file)
+            const file = (req as any).file;
+            const files = (req as any).files;
+            if (file) {
+                await deleteFiles(file);
             }
-            if (req.files) {
-                await deleteFiles(req.files as Express.Multer.File[])
+            if (files) {
+                await deleteFiles(files);
             }
         }
     }

@@ -38,24 +38,8 @@ export const meals = pgTable("meals", {
 export type Meal = typeof meals.$inferSelect;
 export type NewMeal = typeof meals.$inferInsert;
 
-// ─── Refresh Tokens ───────────────────────────────────────────────────────────
-
-export const refreshTokens = pgTable("refresh_tokens", {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
-    tokenHash: text("token_hash").notNull().unique(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export type RefreshToken = typeof refreshTokens.$inferSelect;
-export type NewRefreshToken = typeof refreshTokens.$inferInsert;
-
-
-export const sessions = pgTable(
-    'sessions',
+export const revokedAccessTokens = pgTable(
+    'revoked_access_tokens',
     {
         id: uuid('id').primaryKey().defaultRandom(),
 
@@ -65,38 +49,46 @@ export const sessions = pgTable(
                 onDelete: 'cascade',
             }),
 
-        // SHA-256 hash of the refresh token
-        refreshTokenHash: varchar('refresh_token_hash', {
-            length: 64,
-        }).notNull().unique(),
-
-        deviceId: varchar('device_id', {
-            length: 255,
-        }),
-
-        deviceName: varchar('device_name', {
-            length: 255,
-        }),
-
-        deviceType: varchar('device_type', {
-            length: 50,
-        }),
+        accessToken: varchar('access_token').notNull().unique(),
 
         userAgent: text('user_agent'),
 
         ipAddress: inet('ip_address'),
 
-        // Session expiration
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+        }).defaultNow().notNull(),
+    },
+    (table) => [
+        index('revoked_access_tokens_user_id_idx')
+            .on(table.userId),
+
+        index('revoked_access_tokens_created_at_idx')
+            .on(table.createdAt),
+    ],
+);
+
+export const userSessions = pgTable(
+    'user_sessions',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+
+        userId: uuid('user_id')
+            .notNull()
+            .references(() => users.id, {
+                onDelete: 'cascade',
+            }),
+
+        refreshTokenHash: varchar('refresh_token_hash').notNull().unique(),
+
+        userAgent: text('user_agent'),
+
+        ipAddress: inet('ip_address'),
+
         expiresAt: timestamp('expires_at', {
             withTimezone: true,
         }).notNull(),
 
-        // Last successful activity
-        lastActiveAt: timestamp('last_active_at', {
-            withTimezone: true,
-        }).defaultNow().notNull(),
-
-        // Revocation support
         revokedAt: timestamp('revoked_at', {
             withTimezone: true,
         }),
@@ -110,13 +102,15 @@ export const sessions = pgTable(
         }).defaultNow().notNull(),
     },
     (table) => [
-        index('sessions_user_id_idx')
+        index('user_sessions_user_id_idx')
             .on(table.userId),
 
-        index('sessions_expires_at_idx')
+        index('user_sessions_expires_at_idx')
             .on(table.expiresAt),
 
-        index('sessions_revoked_at_idx')
+        index('user_sessions_revoked_at_idx')
             .on(table.revokedAt),
     ],
 );
+
+export type Session = typeof userSessions.$inferSelect;

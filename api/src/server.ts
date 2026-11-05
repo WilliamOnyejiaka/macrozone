@@ -9,7 +9,6 @@ process.on("unhandledRejection", (reason, promise) => {
 
 process.on("uncaughtException", (error) => {
     logger.error("Uncaught Exception:", error);
-    // For uncaught exceptions
     process.exit(1);
 });
 
