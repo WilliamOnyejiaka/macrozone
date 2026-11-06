@@ -1,7 +1,10 @@
 # MacroZone API Documentation
 
-**Base URL:** `http://localhost:3000/api/v1`  
-**Content-Type:** `application/json` (unless noted)
+| | |
+|---|---|
+| **Base URL** | `https://macrozone.onrender.com/api/v1` |
+| **Content-Type** | `application/json` *(unless noted)* |
+| **Apidog Docs** | https://ojlfli5ui7.apidog.io |
 
 ---
 
