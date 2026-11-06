@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import { HttpStatus, HttpStatusMessage, TokenType } from "../types/constants";
 import { TOKEN_SECRET } from "../../config/env";
 import Token from "../services/token.service";
+import { db } from "../../db";
+import { revokedAccessTokens } from "../../db/schema";
+import { eq } from "drizzle-orm";
 
 const verifyJWT =
     (types: string[], neededData: string[] = ["data"]) =>
@@ -47,17 +50,19 @@ const verifyJWT =
             }
 
             if (types.includes(TokenType.ACCESS)) {
-                const identifier = tokenValidationResult.data?.jti || token;
-                // const blacklisted =
-                //     await TokenBlacklist.getInstance().isBlacklisted(identifier);
+                const [revoked] = await db
+                    .select()
+                    .from(revokedAccessTokens)
+                    .where(eq(revokedAccessTokens.accessToken, token))
+                    .limit(1);
 
-                // if (blacklisted) {
-                //     res.status(HttpStatus.UNAUTHORIZED).json({
-                //         error: true,
-                //         message: "Invalid Token",
-                //     });
-                //     return;
-                // }
+                if (revoked) {
+                    res.status(HttpStatus.UNAUTHORIZED).json({
+                        error: true,
+                        message: "Token has been revoked",
+                    });
+                    return;
+                }
             }
 
             for (let item of neededData) {

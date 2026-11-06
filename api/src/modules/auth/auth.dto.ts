@@ -18,3 +18,12 @@ export interface LoginDto {
     userAgent: string,
     ipAddress: string,
 }
+
+export interface RefreshTokenDto {
+    refreshToken: string;
+}
+
+export interface LogoutDto {
+    refreshToken?: string;
+}
+

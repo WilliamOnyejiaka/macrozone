@@ -1,5 +1,15 @@
-export type { CreateMealDto, UpdateMealDto } from "./meals.service";
+export interface CreateMealDto {
+    name: string;
+    calories: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+}
 
-export interface GetMealsQueryInput {
-    date?: string;
+export interface UpdateMealDto {
+    name?: string;
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
 }

@@ -1,7 +1,5 @@
 import { body, param, query } from "express-validator";
 import handleValidationErrors from "../../common/utils/handle-validation-errors";
-import verifyJWT from "../../common/middlewares/verifyJwt";
-import { TokenType } from "../../common/types";
 
 export const createMealValidator = [
     body("name")
@@ -10,88 +8,87 @@ export const createMealValidator = [
         .withMessage("Meal name is required")
         .isString()
         .withMessage("Meal name must be a string"),
+
     body("calories")
         .notEmpty()
-        .withMessage("Calories is required")
-        .isFloat({ min: 0 })
-        .withMessage("Calories must be a non-negative number")
-        .toFloat(),
+        .withMessage("Calories are required")
+        .isInt({ min: 0 })
+        .withMessage("Calories must be a valid non-negative number"),
+
     body("protein")
         .optional()
-        .isFloat({ min: 0 })
-        .withMessage("Protein must be a non-negative number")
-        .toFloat(),
+        .isInt({ min: 0 })
+        .withMessage("Protein must be a valid non-negative number"),
+
     body("carbs")
         .optional()
-        .isFloat({ min: 0 })
-        .withMessage("Carbs must be a non-negative number")
-        .toFloat(),
+        .isInt({ min: 0 })
+        .withMessage("Carbs must be a valid non-negative number"),
+
     body("fat")
         .optional()
-        .isFloat({ min: 0 })
-        .withMessage("Fat must be a non-negative number")
-        .toFloat(),
-    handleValidationErrors,
+        .isInt({ min: 0 })
+        .withMessage("Fat must be a valid non-negative number"),
+
+    handleValidationErrors
+];
+
+export const getMealsValidator = [
+    query("page")
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage("Page must be an integer greater than 0"),
+
+    query("limit")
+        .optional()
+        .isInt({ min: 1, max: 100 })
+        .withMessage("Limit must be an integer between 1 and 100"),
+
+    handleValidationErrors
 ];
 
 export const updateMealValidator = [
     param("id")
+        .notEmpty()
+        .withMessage("Meal ID is required")
         .isUUID()
-        .withMessage("Valid meal id is required"),
+        .withMessage("Meal ID must be a valid UUID"),
+
     body("name")
         .optional()
         .trim()
-        .notEmpty()
-        .withMessage("Meal name cannot be empty")
         .isString()
         .withMessage("Meal name must be a string"),
+
     body("calories")
         .optional()
-        .isFloat({ min: 0 })
-        .withMessage("Calories must be a non-negative number")
-        .toFloat(),
+        .isInt({ min: 0 })
+        .withMessage("Calories must be a valid non-negative number"),
+
     body("protein")
         .optional()
-        .isFloat({ min: 0 })
-        .withMessage("Protein must be a non-negative number")
-        .toFloat(),
+        .isInt({ min: 0 })
+        .withMessage("Protein must be a valid non-negative number"),
+
     body("carbs")
         .optional()
-        .isFloat({ min: 0 })
-        .withMessage("Carbs must be a non-negative number")
-        .toFloat(),
+        .isInt({ min: 0 })
+        .withMessage("Carbs must be a valid non-negative number"),
+
     body("fat")
         .optional()
-        .isFloat({ min: 0 })
-        .withMessage("Fat must be a non-negative number")
-        .toFloat(),
-    body().custom((value, { req }) => {
-        const { name, calories, protein, carbs, fat } = req.body || {};
-        if (
-            name === undefined &&
-            calories === undefined &&
-            protein === undefined &&
-            carbs === undefined &&
-            fat === undefined
-        ) {
-            throw new Error("At least one field must be provided to update");
-        }
-        return true;
-    }),
-    handleValidationErrors,
+        .isInt({ min: 0 })
+        .withMessage("Fat must be a valid non-negative number"),
+
+    handleValidationErrors
 ];
 
 export const mealIdParamValidator = [
     param("id")
+        .notEmpty()
+        .withMessage("Meal ID is required")
         .isUUID()
-        .withMessage("Valid meal id is required"),
-    handleValidationErrors,
-];
+        .withMessage("Meal ID must be a valid UUID"),
 
-export const getMealsValidator = [
-    query("date")
-        .optional()
-        .isISO8601()
-        .withMessage("Valid date format (YYYY-MM-DD) is required"),
-    handleValidationErrors,
+    handleValidationErrors
 ];

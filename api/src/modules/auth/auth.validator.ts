@@ -1,5 +1,7 @@
 import { body } from "express-validator";
 import handleValidationErrors from "../../common/utils/handle-validation-errors";
+import verifyJWT from "../../common/middlewares/verify-jwt";
+import { TokenType } from "../../common/types";
 
 export const signUpValidator = [
     body("name")
@@ -39,4 +41,25 @@ export const loginValidator = [
         .notEmpty()
         .withMessage("Password is required"),
     handleValidationErrors,
+];
+
+export const refreshTokenValidator = [
+    // body("refreshToken")
+    //     .notEmpty()
+    //     .withMessage("refreshToken is required")
+    //     .isString()
+    //     .withMessage("refreshToken must be a string"),
+    verifyJWT([TokenType.REFRESH]),
+
+    handleValidationErrors
+];
+
+export const logoutValidator = [
+    verifyJWT([TokenType.ACCESS, TokenType.REFRESH]),
+    body("refreshToken")
+        .optional()
+        .isString()
+        .withMessage("refreshToken must be a string"),
+
+    handleValidationErrors
 ];

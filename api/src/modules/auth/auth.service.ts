@@ -1,15 +1,15 @@
+import crypto from "crypto";
 import BaseService from "../../common/services";
 import { LoginDto, SignUpDto } from "./auth.dto";
 import { db } from "./../../db";
-import { userSessions, users } from "../../db/schema";
-import { and, eq, gt, lt, or } from "drizzle-orm";
+import { revokedAccessTokens, userSessions, users } from "../../db/schema";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { HttpStatus, TokenType } from "../../common/types";
 import Password from "../../common/utils/password";
 import TransactionException from "../../common/errors/transaction-exception";
 import { STORED_SALT, TOKEN_SECRET, SECRET_KEY, REFRESH_TOKEN_EXPIRES, ACCESS_TOKEN_EXPIRES } from "../../config/env";
 import ms, { StringValue } from "ms";
 import Token from "../../common/services/token.service";
-
 
 export default class Authentication extends BaseService {
 
@@ -19,6 +19,10 @@ export default class Authentication extends BaseService {
 
     public constructor() {
         super();
+    }
+
+    private hashRefreshToken(token: string): string {
+        return crypto.createHash("sha256").update(token).digest("hex");
     }
 
     private generateToken(data: any, type: string, expiresIn: string = ACCESS_TOKEN_EXPIRES) {
@@ -63,7 +67,7 @@ export default class Authentication extends BaseService {
                 const REFRESH_TOKEN_TTL = ms(REFRESH_TOKEN_EXPIRES as StringValue);
                 const refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL);
 
-                const refreshTokenHash = await Password.hash(refreshToken);
+                const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
                 const [newUserSession] = await tx.insert(userSessions).values({
                     refreshTokenHash,
@@ -121,7 +125,7 @@ export default class Authentication extends BaseService {
                 const REFRESH_TOKEN_TTL = ms(REFRESH_TOKEN_EXPIRES as StringValue);
                 const refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL);
 
-                const refreshTokenHash = await Password.hash(refreshToken);
+                const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
                 // 4. Record the user session (capturing IP and User-Agent)
                 const [newUserSession] = await tx.insert(userSessions).values({
@@ -152,94 +156,117 @@ export default class Authentication extends BaseService {
         }
     }
 
-    public async logout(payload: { userId: string; refreshToken?: string }) {
+    public async refreshToken(payload: { userId: string; refreshToken: string; ipAddress?: string; userAgent?: string }) {
         try {
-            if (payload.refreshToken) {
-                // Find and remove the specific session matching the refresh token hash
-                const sessions = await db
+            const hashedToken = this.hashRefreshToken(payload.refreshToken);
+
+            const result = await db.transaction(async (tx) => {
+                // Find non-expired, non-revoked session matching the hashed refresh token
+                const [validSession] = await tx
+                    .select()
+                    .from(userSessions)
+                    .where(
+                        and(
+                            eq(userSessions.userId, payload.userId),
+                            eq(userSessions.refreshTokenHash, hashedToken),
+                            gt(userSessions.expiresAt, new Date()),
+                            isNull(userSessions.revokedAt)
+                        )
+                    )
+                    .limit(1);
+
+                if (!validSession) {
+                    return null;
+                }
+
+                // Implement token rotation by deleting the old session
+                await tx
                     .delete(userSessions)
-                    .where(and(
-                        eq(userSessions.userId, payload.userId),
-                        eq(userSessions.refreshTokenHash, payload.refreshToken)
-                    ));
-            } else {
-                // Fallback: Clear all sessions for the user (global logout)
-                await db.delete(userSessions).where(eq(userSessions.userId, payload.userId));
+                    .where(eq(userSessions.id, validSession.id));
+
+                const accessToken = this.generateUserToken({ id: payload.userId }, TokenType.ACCESS);
+                const newRefreshToken = this.generateToken(
+                    { id: payload.userId },
+                    TokenType.REFRESH,
+                    REFRESH_TOKEN_EXPIRES
+                );
+
+                const REFRESH_TOKEN_TTL = ms(REFRESH_TOKEN_EXPIRES as StringValue);
+                const refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL);
+
+                const newRefreshTokenHash = this.hashRefreshToken(newRefreshToken);
+
+                const [newUserSession] = await tx.insert(userSessions).values({
+                    refreshTokenHash: newRefreshTokenHash,
+                    userId: payload.userId,
+                    expiresAt: refreshTokenExpires,
+                    ipAddress: payload.ipAddress,
+                    userAgent: payload.userAgent
+                }).returning();
+
+                if (!newUserSession) {
+                    throw new TransactionException("Failed to create user session", HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+
+                return { accessToken, refreshToken: newRefreshToken };
+            });
+
+            if (!result) {
+                return super.errorResponse(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
             }
 
             return super.successResponse(
                 HttpStatus.OK,
-                "User has been logged out successfully");
+                "Access token refreshed successfully",
+                result
+            );
         } catch (error) {
             return super.handleError(error);
         }
     }
 
-    // public async refresh(payload: { refreshToken: string; ipAddress?: string; userAgent?: string }) {
-    //     try {
-    //         // 1. Verify token signature
-    //         const decoded = verifyToken(payload.refreshToken, TokenType.REFRESH);
-    //         if (!decoded) {
-    //             return super.errorResponse(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token.");
-    //         }
+    public async logout(payload: {
+        userId: string;
+        refreshToken?: string;
+        accessToken?: string;
+        ipAddress?: string;
+        userAgent?: string;
+    }) {
+        try {
+            await db.transaction(async (tx) => {
+                // 1. Blacklist / revoke the current access token
+                if (payload.accessToken) {
+                    await tx
+                        .insert(revokedAccessTokens)
+                        .values({
+                            userId: payload.userId,
+                            accessToken: payload.accessToken,
+                            ipAddress: payload.ipAddress,
+                            userAgent: payload.userAgent,
+                        })
+                        .onConflictDoNothing();
+                }
 
-    //         // 2. Find user sessions and match the stored hash
-    //         const sessions = await db
-    //             .select()
-    //             .from(userSessions)
-    //             .where(eq(userSessions.userId, decoded.id));
+                // 2. Remove or invalidate refresh token session
+                if (payload.refreshToken) {
+                    const hashedToken = this.hashRefreshToken(payload.refreshToken);
+                    await tx
+                        .delete(userSessions)
+                        .where(and(
+                            eq(userSessions.userId, payload.userId),
+                            eq(userSessions.refreshTokenHash, hashedToken)
+                        ));
+                } else {
+                    await tx.delete(userSessions).where(eq(userSessions.userId, payload.userId));
+                }
+            });
 
-    //         let validSession = null;
-    //         for (const session of sessions) {
-    //             const isMatch = await Password.compare(payload.refreshToken, session.refreshTokenHash);
-    //             if (isMatch) {
-    //                 validSession = session;
-    //                 break;
-    //             }
-    //         }
-
-    //         if (!validSession || new Date() > new Date(validSession.expiresAt)) {
-    //             return super.errorResponse(HttpStatus.UNAUTHORIZED, "Session expired or invalid.");
-    //         }
-
-    //         // 3. Fetch user
-    //         const [user] = await db
-    //             .select()
-    //             .from(users)
-    //             .where(eq(users.id, decoded.id))
-    //             .limit(1);
-
-    //         if (!user) {
-    //             return super.errorResponse(HttpStatus.UNAUTHORIZED, "User not found.");
-    //         }
-
-    //         // 4. Generate new tokens & rotate session
-    //         const accessToken = this.generateUserToken({ id: user.id }, TokenType.ACCESS);
-    //         const newRefreshToken = this.generateToken({ id: user.id }, TokenType.REFRESH, REFRESH_TOKEN_EXPIRES);
-
-    //         const REFRESH_TOKEN_TTL = ms(REFRESH_TOKEN_EXPIRES as StringValue);
-    //         const refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL);
-    //         const newRefreshTokenHash = await Password.hash(newRefreshToken);
-
-    //         await db.transaction(async (tx) => {
-    //             await tx.update(userSessions)
-    //                 .set({
-    //                     refreshTokenHash: newRefreshTokenHash,
-    //                     expiresAt: refreshTokenExpires,
-    //                     ipAddress: payload.ipAddress,
-    //                     userAgent: payload.userAgent,
-    //                 })
-    //                 .where(eq(userSessions.id, validSession.id));
-    //         });
-
-    //         return super.successResponse(
-    //             HttpStatus.OK,
-    //             "Token refreshed successfully",
-    //             { accessToken, refreshToken: newRefreshToken }
-    //         );
-    //     } catch (error) {
-    //         return super.handleError(error);
-    //     }
-    // }
-
+            return super.successResponse(
+                HttpStatus.OK,
+                "User has been logged out successfully"
+            );
+        } catch (error) {
+            return super.handleError(error);
+        }
+    }
 }

@@ -1,28 +1,25 @@
 import { Router } from "express";
-import verifyJWT from "../../common/middlewares/verifyJwt";
-import { TokenType } from "../../common/types/constants";
+import asyncHandler from "express-async-handler";
 import {
-    getMeals,
     createMeal,
+    getMeals,
+    getMealById,
     updateMeal,
-    deleteMeal,
-    deleteAllMeals,
+    deleteMeal
 } from "./meals.controller";
 import {
     createMealValidator,
     updateMealValidator,
     mealIdParamValidator,
-    getMealsValidator,
+    getMealsValidator
 } from "./meals.validator";
 
 const router = Router();
 
-// All meal routes require a valid access token
-router.get("/", getMealsValidator, getMeals);
-router.post("/", createMealValidator, createMeal);
-router.patch("/:id", updateMealValidator, updateMeal);
-router.delete("/", deleteAllMeals); // must come BEFORE /:id
-router.delete("/:id", mealIdParamValidator, deleteMeal);
+router.post("/", createMealValidator, asyncHandler(createMeal));
+router.get("/", getMealsValidator, asyncHandler(getMeals));
+router.get("/:id", mealIdParamValidator, asyncHandler(getMealById));
+router.patch("/:id", updateMealValidator, asyncHandler(updateMeal));
+router.delete("/:id", mealIdParamValidator, asyncHandler(deleteMeal));
 
 export default router;
-
