@@ -48,22 +48,6 @@ export async function refreshToken(req: Request, res: Response) {
 }
 
 
-export async function refreshTokens(req: Request, res: Response) {
-    const { id: userId } = res.locals.data;
-    const { refreshToken } = req.body;
-    const ipAddress = req.ip || req.socket.remoteAddress;
-    const userAgent = req.headers['user-agent'];
-
-    const result = await service.refreshToken({
-        userId,
-        refreshToken,
-        ipAddress,
-        userAgent
-    });
-
-    response(res, result);
-}
-
 export async function logout(req: Request, res: Response) {
     const { id: userId } = res.locals.data;
     const { refreshToken } = req.body;

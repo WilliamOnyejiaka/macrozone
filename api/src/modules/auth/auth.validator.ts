@@ -55,7 +55,7 @@ export const refreshTokenValidator = [
 ];
 
 export const logoutValidator = [
-    verifyJWT([TokenType.ACCESS, TokenType.REFRESH]),
+    verifyJWT([TokenType.ACCESS]),
     body("refreshToken")
         .optional()
         .isString()

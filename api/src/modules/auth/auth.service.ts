@@ -22,7 +22,7 @@ export default class Authentication extends BaseService {
     }
 
     private hashRefreshToken(token: string): string {
-        return crypto.createHash("sha256").update(token).digest("hex");
+        return crypto.createHmac("sha256", this.secretKey).update(token).digest("hex");
     }
 
     private generateToken(data: any, type: string, expiresIn: string = ACCESS_TOKEN_EXPIRES) {
