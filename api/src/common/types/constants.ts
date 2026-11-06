@@ -342,12 +342,7 @@ export enum ResourceType {
 }
 
 export enum CdnFolders {
-  USER_PICTURES = "brdgr-cdn/profile-pictures/users",
-  ORGANIZATION_LOGOS = "brdgr-cdn/organizations/logos",
-  EVIDENCE_DOCUMENTS = "brdgr-cdn/evidence-documents",
-  KYC_DOCUMENTS = "brdgr-cdn/kyc-documents",
-  CAMPAIGN_ASSETS = "brdgr-cdn/campaigns/assets",
-  CAMPAIGN_MATERIALS = "brdgr-cdn/campaigns/materials",
+  USER_PICTURES = "macrozone-cdn/profile-pictures/users"
 }
 
 export enum UploadType {
@@ -370,51 +365,4 @@ export enum OTPPurpose {
   SIGN_UP = "signup",
   PASSWORD_RESET = "password_reset",
   CHANGE_EMAIL = "change_email",
-}
-
-export enum CacheTTL {
-  SHORT = 30,
-
-  MEDIUM = 300,
-
-  LONG = 1800,
-
-  HOUR = 3600,
-
-  DAY = 86400,
-
-  WEEK = 604800,
-
-  MONTH = 2629743,
-
-  YEAR = 31536000,
-};
-
-export enum CampaignStatus {
-    DRAFT = "draft",
-    PENDING_REVIEW = "pending_review",
-    MATCHING = "matching",
-    ACTIVE = "active",
-    COMPLETED = "completed",
-    CANCELLED = "cancelled",
-}
-
-export enum CampaignAssignmentStatus {
-    PENDING  = "pending",
-    ACCEPTED = "accepted",
-    DECLINED = "declined",
-}
-
-export enum PendingChangeStatus {
-  PENDING  = "pending",
-  APPROVED = "approved",
-  REJECTED = "rejected",
-  EXPIRED  = "expired",
-}
-
-export enum AchievementStatus {
-    NORMAL        = "normal",           // ≥ normalThreshold (default 90%)
-    MONITOR       = "monitor",          // ≥ monitorThreshold (default 70%)
-    PIP_CANDIDATE = "pip_candidate",    // ≥ pipCandidateThreshold (default 50%)
-    PIP_REVIEW    = "pip_review",       // < pipCandidateThreshold
 }
